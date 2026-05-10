@@ -17,7 +17,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
 // ══ CONSTANTS ═══════════════════════════════════════════════════════════════
-const CATS = ['All', 'News', 'Exclusives', 'Guides', 'Recommended'];
+const CATS = ['All', 'Sports', 'Business', 'Health', 'Entertainment', 'Technology', 'Science'];
 const LANGUAGES = ['Hindi','Tamil','Telugu','Bengali','Marathi','Kannada','Spanish','French','German','Arabic','Chinese','Japanese'];
 const BREAKPOINTS = { default: 3, 1100: 2, 700: 1 };
 
@@ -43,6 +43,11 @@ const textValue = (value, fallback='') => {
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (typeof value === 'object') return value.summary || value.explanation || value.translated || value.reason || value.note || fallback;
   return fallback;
+};
+const getYoutubeId = (url) => {
+  if (!url) return null;
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+  return match ? match[1] : null;
 };
 
 const getSavedArticles = () => JSON.parse(localStorage.getItem('savedArticles')||'[]');
@@ -126,7 +131,7 @@ function AuthPage() {
     <div className="auth-bg">
       <div className="auth-left">
         <div className="auth-left-inner">
-          <div className="auth-logo">News<span className="auth-logo-ai">AI</span><div className="auth-logo-dot"/></div>
+          <div className="auth-logo"><img src="/logo.png" alt="" style={{height:40}}/>News<span className="auth-logo-ai">AI</span></div>
           <h2 className="auth-tagline">Your AI-Powered<br/>News Universe</h2>
           <p className="auth-subtagline">Sign in to unlock the full NewsAI experience — personalized, intelligent, and real-time.</p>
         </div>
@@ -182,7 +187,7 @@ function AuthPage() {
 }
 
 // ══ USER MENU ════════════════════════════════════════════════════════════════
-function UserMenu({ onOpenSuggest, onOpenSaved, onOpenComments, onOpenSuggestions }) {
+function UserMenu({ onOpenSuggest, onOpenSaved, onOpenComments, onOpenSuggestions, theme, setTheme }) {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -221,6 +226,10 @@ function UserMenu({ onOpenSuggest, onOpenSaved, onOpenComments, onOpenSuggestion
             <button key={i} className="user-drop-item" onClick={item.action}><span>{item.icon}</span>{item.label}</button>
           ))}
           <div className="user-drop-divider"/>
+          <button className="user-drop-item" onClick={()=>{setTheme(theme==='light'?'dark':'light');setOpen(false);}}>
+            <span>{theme==='light'?'🌙':'☀️'}</span>Toggle Theme
+          </button>
+          <div className="user-drop-divider"/>
           <button className="user-drop-item danger" onClick={()=>{logout();setOpen(false);}}><span>🚪</span>Sign Out</button>
         </div>
       )}
@@ -228,7 +237,7 @@ function UserMenu({ onOpenSuggest, onOpenSaved, onOpenComments, onOpenSuggestion
   );
 }
 
-// ══ WEATHER WIDGET ═══════════════════════════════════════════════════════════
+// ══ WEATHER WIDGET & LIVE CLOCK ═════════════════════════════════════════════
 function WeatherWidget() {
   const [w, setW] = useState(null);
   useEffect(()=>{
@@ -250,7 +259,6 @@ function WeatherWidget() {
   );
 }
 
-// ══ LIVE CLOCK ═══════════════════════════════════════════════════════════════
 function LiveClock() {
   const [t, setT] = useState(new Date());
   useEffect(()=>{ const i=setInterval(()=>setT(new Date()),1000); return()=>clearInterval(i); },[]);
@@ -571,13 +579,27 @@ function ArticleModal({ article, onClose }) {
   }
 
   const text=article.description||'';
+  const ytId = getYoutubeId(article.url);
+
   return (
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()} style={{padding:0}}>
-      <div className="modal-card" style={{padding:0, borderRadius:'var(--radius)', overflow:'hidden'}}>
-        <button className="modal-close-btn" onClick={onClose} style={{background:'var(--surface-solid)', boxShadow:'var(--shadow-lg)'}}>✕</button>
-        {article.image&&<img className="modal-hero-img" src={article.image} alt={article.title} onError={e=>e.target.style.display='none'}/>}
+      <div className="modal-card">
+        <button className="modal-close-btn" onClick={onClose}>✕</button>
+        {ytId ? (
+          <iframe 
+            src={`https://www.youtube.com/embed/${ytId}`} 
+            title="YouTube video player" 
+            frameBorder="0" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            allowFullScreen
+            style={{ width: 'calc(100% + 5rem)', height: '400px', borderRadius: '28px 28px 0 0', margin: '-2.5rem -2.5rem 2rem -2.5rem', display: 'block' }}
+          ></iframe>
+        ) : article.image ? (
+          <img className="modal-hero-img" src={article.image} alt={article.title} onError={e=>e.target.style.display='none'}/>
+        ) : null}
+        
         <div className="modal-body">
-          <div className="card-header-meta" style={{marginBottom:'0.8rem'}}>
+          <div className="card-header-meta" style={{marginBottom:'1rem'}}>
             <span className="card-source">{article.source}</span>
             <span>·</span>
             <span>{timeAgo(article.publishedAt)}</span>
@@ -588,10 +610,10 @@ function ArticleModal({ article, onClose }) {
           <h1 className="modal-title">{article.title}</h1>
           {text&&<p className="modal-desc">{text}</p>}
           <AIPanel article={article}/>
-          <div style={{display:'flex', gap:10, flexWrap:'wrap', marginTop:'1rem'}}>
-            <a href={article.url} target="_blank" rel="noopener noreferrer" className="btn-primary" style={{width:'auto', padding:'8px 18px', fontSize:'0.85rem'}}>Read Full Article ↗</a>
-            <button className="pill" onClick={toggleSave}>{saved?'🔖 Saved':'🔖 Save'}</button>
-            <button className="pill" onClick={()=>shareArticle(article)}>📤 Share</button>
+          <div style={{display:'flex', gap:10, flexWrap:'wrap', marginTop:'1.5rem'}}>
+            <a href={article.url} target="_blank" rel="noopener noreferrer" className="btn-primary">Read Full Article ↗</a>
+            <button className="pill" onClick={toggleSave} style={{padding: '0 24px', borderRadius: '99px'}}>{saved?'🔖 Saved':'🔖 Save'}</button>
+            <button className="pill" onClick={()=>shareArticle(article)} style={{padding: '0 24px', borderRadius: '99px'}}>📤 Share</button>
           </div>
           <div className="cr-section">
             <h3 className="cr-title">Community</h3>
@@ -604,7 +626,7 @@ function ArticleModal({ article, onClose }) {
   );
 }
 
-// ══ WRITE ARTICLE MODAL ═══════════════════════════════════════════════════════
+// ══ MODALS & FORMS ════════════════════════════════════════════════════════════
 function WriteArticleModal({ onClose, onPublish }) {
   const { user } = useAuth();
   const [form, setForm] = useState({ title:'', description:'', image:'', source:'NewsAI', category:'News' });
@@ -616,39 +638,27 @@ function WriteArticleModal({ onClose, onPublish }) {
     e.preventDefault();
     if(!form.title || !form.description) return toast.error('Title and description required');
     setLoading(true);
-    
-    const newArticle = {
-      ...form,
-      id: `custom-${Date.now()}`,
-      publishedAt: new Date().toISOString(),
-      url: `https://newsai.local/article/${Date.now()}`,
-      isCustom: true,
-      author: user.displayName || user.email
-    };
-
+    const newArticle = { ...form, id: `custom-${Date.now()}`, publishedAt: new Date().toISOString(), url: `https://newsai.local/article/${Date.now()}`, isCustom: true, author: user.displayName || user.email };
     try {
       if (!isFirebaseEnabled) {
         const customArticles = JSON.parse(localStorage.getItem('newsai_custom_articles')||'[]');
         localStorage.setItem('newsai_custom_articles', JSON.stringify([newArticle, ...customArticles]));
-      } else {
-        await addDoc(collection(db,'custom_articles'), newArticle);
-      }
-      toast.success('Article published successfully!');
-      onPublish(newArticle);
-      onClose();
-    } catch {
-      toast.error('Failed to publish article');
-    }
+      } else { await addDoc(collection(db,'custom_articles'), newArticle); }
+      toast.success('Article published successfully!'); onPublish(newArticle); onClose();
+    } catch { toast.error('Failed to publish article'); }
     setLoading(false);
   }
 
   return (
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal-card write-article-form">
+      <div className="modal-card write-article-form" style={{maxWidth: 600}}>
         <button className="modal-close-btn" onClick={onClose}>✕</button>
-        <h2 style={{fontFamily:'var(--font-display)', fontSize:'1.8rem', marginBottom:'1.5rem'}}>Write Article</h2>
-        
-        <form onSubmit={handleSubmit}>
+        <div style={{textAlign:'center', marginBottom:'2rem'}}>
+          <div style={{fontSize:'3.5rem', marginBottom:'0.5rem'}}>✍️</div>
+          <h2 style={{fontFamily:'var(--font-display)', fontSize:'2rem', fontWeight:900, color:'var(--ink)'}}>Write Article</h2>
+          <p style={{fontSize:'1rem', color:'var(--muted)'}}>Share your news or opinion with the community.</p>
+        </div>
+        <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column'}}>
           <div className="form-field">
             <label className="form-label">Headline</label>
             <input className="form-input" name="title" value={form.title} onChange={onChange} placeholder="Enter an engaging headline..." />
@@ -660,14 +670,14 @@ function WriteArticleModal({ onClose, onPublish }) {
           <div className="form-field">
             <label className="form-label">Category</label>
             <select className="form-input" name="category" value={form.category} onChange={onChange}>
-              {CATS.filter(c=>c!=='All'&&c!=='Recommended').map(c=><option key={c} value={c}>{c}</option>)}
+              {CATS.filter(c=>c!=='All').map(c=><option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="form-field">
             <label className="form-label">Content</label>
-            <textarea className="form-input" name="description" value={form.description} onChange={onChange} placeholder="Write your article content here..." />
+            <textarea className="form-input" name="description" value={form.description} onChange={onChange} placeholder="Write your article content here..." rows={6} />
           </div>
-          <button type="submit" className="btn-primary" disabled={loading}>
+          <button type="submit" className="btn-primary" disabled={loading} style={{marginTop:'0.5rem', padding:'16px'}}>
             {loading ? 'Publishing...' : 'Publish Article'}
           </button>
         </form>
@@ -676,7 +686,6 @@ function WriteArticleModal({ onClose, onPublish }) {
   );
 }
 
-// ══ SUGGEST ARTICLE ═══════════════════════════════════════════════════════════
 function SuggestArticle({ onClose }) {
   const { user } = useAuth();
   const [form, setForm] = useState({title:'',url:'',description:'',category:'News',reason:''});
@@ -692,35 +701,32 @@ function SuggestArticle({ onClose }) {
       if (!isFirebaseEnabled) {
         const suggestions = JSON.parse(localStorage.getItem('newsai_demo_suggestions')||'[]');
         suggestions.unshift({
-          id:`demo-${Date.now()}`,
-          ...form,
+          id:`demo-${Date.now()}`, ...form,
           submittedBy:{uid:user.uid,name:user.displayName||'Anonymous',email:user.email,photo:user.photoURL||null},
           status:'pending', votes:0, createdAt:new Date().toISOString(),
         });
         localStorage.setItem('newsai_demo_suggestions', JSON.stringify(suggestions));
       } else {
         await addDoc(collection(db,'suggestions'),{
-          ...form,
-          submittedBy:{uid:user.uid,name:user.displayName||'Anonymous',email:user.email,photo:user.photoURL||null},
+          ...form, submittedBy:{uid:user.uid,name:user.displayName||'Anonymous',email:user.email,photo:user.photoURL||null},
           status:'pending', votes:0, createdAt:serverTimestamp(),
         });
       }
-      toast.success('Article suggested! Thank you 🎉');
-      onClose();
+      toast.success('Article suggested! Thank you 🎉'); onClose();
     } catch { toast.error('Failed to submit. Check your internet.'); }
     setLoading(false);
   }
 
   return (
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal-card">
+      <div className="modal-card" style={{maxWidth: 550}}>
         <button className="modal-close-btn" onClick={onClose}>✕</button>
-        <div style={{textAlign:'center', marginBottom:'1.5rem'}}>
-          <div style={{fontSize:'2.5rem', marginBottom:'0.5rem'}}>💡</div>
-          <h2 style={{fontFamily:'var(--font-display)', fontSize:'1.5rem', fontWeight:900}}>Suggest an Article</h2>
-          <p style={{fontSize:'0.85rem', color:'var(--muted)'}}>Know a great story? Share it with the community!</p>
+        <div style={{textAlign:'center', marginBottom:'2rem'}}>
+          <div style={{fontSize:'3.5rem', marginBottom:'0.5rem'}}>💡</div>
+          <h2 style={{fontFamily:'var(--font-display)', fontSize:'2rem', fontWeight:900, color:'var(--ink)'}}>Suggest an Article</h2>
+          <p style={{fontSize:'1rem', color:'var(--muted)'}}>Know a great story? Share it with the community!</p>
         </div>
-        <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+        <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column'}}>
           <div className="form-field">
             <label className="form-label">Article Title *</label>
             <input name="title" value={form.title} onChange={onChange} placeholder="Enter the article headline..." className="form-input"/>
@@ -729,10 +735,171 @@ function SuggestArticle({ onClose }) {
             <label className="form-label">Article URL *</label>
             <input name="url" value={form.url} onChange={onChange} placeholder="https://..." className="form-input"/>
           </div>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading?'Submitting...':'Submit Suggestion 💡'}
+          <button type="submit" className="btn-primary" disabled={loading} style={{marginTop:'0.5rem', padding:'16px'}}>
+            {loading?'Submitting...':'Submit Suggestion'}
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function MyCommentsModal({ onClose }) {
+  const { user } = useAuth();
+  const [comments, setComments] = useState([]);
+  useEffect(()=>{
+    const all = JSON.parse(localStorage.getItem('newsai_demo_comments')||'{}');
+    let myCmts = [];
+    Object.keys(all).forEach(k => { myCmts = [...myCmts, ...all[k].filter(c=>c.userId===user.uid)]; });
+    setComments(myCmts.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)));
+  },[user.uid]);
+
+  return (
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-card" style={{maxWidth:600}}>
+        <button className="modal-close-btn" onClick={onClose}>✕</button>
+        <div style={{textAlign:'center', marginBottom:'2rem'}}>
+          <div style={{fontSize:'3.5rem', marginBottom:'0.5rem'}}>💬</div>
+          <h2 style={{fontFamily:'var(--font-display)', fontSize:'2rem', fontWeight:900, color:'var(--ink)'}}>My Comments</h2>
+          <p style={{fontSize:'1rem', color:'var(--muted)'}}>Manage your past discussions.</p>
+        </div>
+        <div style={{maxHeight:'50vh', overflowY:'auto', paddingRight:'1rem'}}>
+          {comments.length===0 && <div style={{textAlign:'center', color:'var(--muted)', padding:'3rem', background:'var(--bg)', borderRadius:'16px'}}>No comments found.</div>}
+          {comments.map((c,i)=>(
+            <div key={i} className="modal-list-item" style={{flexDirection:'column', alignItems:'flex-start'}}>
+              <div style={{fontSize:'0.9rem', fontWeight:700, color:'var(--accent)', marginBottom:8}}>{c.articleTitle}</div>
+              <div style={{fontSize:'1rem', color:'var(--ink)', marginBottom:8, fontStyle:'italic'}}>"{c.text}"</div>
+              <div style={{fontSize:'0.75rem', color:'var(--muted)'}}>{commentTimeAgo(c.createdAt)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SuggestedArticlesModal({ onClose, onPublish }) {
+  const { user } = useAuth();
+  const [suggestions, setSuggestions] = useState([]);
+  const [isAdminView, setIsAdminView] = useState(false);
+
+  useEffect(()=>{
+    fetchSuggestions();
+  },[]);
+
+  function fetchSuggestions() {
+    if (!isFirebaseEnabled) {
+      const all = JSON.parse(localStorage.getItem('newsai_demo_suggestions')||'[]');
+      setSuggestions(all);
+    } else {
+      const q = query(collection(db, 'suggestions'), orderBy('createdAt', 'desc'));
+      onSnapshot(q, snap => {
+        setSuggestions(snap.docs.map(d => ({id: d.id, ...d.data()})));
+      });
+    }
+  }
+
+  async function handleAction(suggestion, action) {
+    try {
+      if (!isFirebaseEnabled) {
+        const all = JSON.parse(localStorage.getItem('newsai_demo_suggestions')||'[]');
+        const updated = all.map(s => s.id === suggestion.id ? { ...s, status: action } : s);
+        localStorage.setItem('newsai_demo_suggestions', JSON.stringify(updated));
+        
+        if (action === 'approved') {
+          const customArticles = JSON.parse(localStorage.getItem('newsai_custom_articles')||'[]');
+          const newArticle = { title: suggestion.title, url: suggestion.url, category: suggestion.category, description: suggestion.description||'', source: 'NewsAI Community', publishedAt: new Date().toISOString(), id: `custom-${Date.now()}`, isCustom: true };
+          localStorage.setItem('newsai_custom_articles', JSON.stringify([newArticle, ...customArticles]));
+          onPublish(newArticle);
+        }
+        setSuggestions(updated);
+        toast.success(`Article ${action}!`);
+      } else {
+        await setDoc(doc(db, 'suggestions', suggestion.id), { status: action }, { merge: true });
+        if (action === 'approved') {
+          const newArticle = { title: suggestion.title, url: suggestion.url, category: suggestion.category, description: suggestion.description||'', source: 'NewsAI Community', publishedAt: new Date().toISOString(), id: `custom-${Date.now()}`, isCustom: true };
+          await addDoc(collection(db,'custom_articles'), newArticle);
+          onPublish(newArticle);
+        }
+        toast.success(`Article ${action}!`);
+      }
+    } catch (e) {
+      toast.error('Failed to update status');
+    }
+  }
+
+  const displayed = isAdminView ? suggestions : suggestions.filter(s=>s.submittedBy.uid===user.uid);
+
+  return (
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-card" style={{maxWidth:700}}>
+        <button className="modal-close-btn" onClick={onClose}>✕</button>
+        <div style={{textAlign:'center', marginBottom:'1.5rem'}}>
+          <div style={{fontSize:'3.5rem', marginBottom:'0.5rem'}}>📋</div>
+          <h2 style={{fontFamily:'var(--font-display)', fontSize:'2rem', fontWeight:900, color:'var(--ink)'}}>Suggested Articles</h2>
+          <p style={{fontSize:'1rem', color:'var(--muted)'}}>Manage article suggestions.</p>
+        </div>
+        
+        {user?.email === 'admin@gmail.com' && (
+          <div style={{display:'flex', justifyContent:'center', marginBottom:'1rem'}}>
+            <div style={{background:'var(--bg)', borderRadius:'99px', padding:'4px', display:'inline-flex'}}>
+              <button className={`pill ${!isAdminView?'active':''}`} style={{border:'none', boxShadow:'none'}} onClick={()=>setIsAdminView(false)}>My Suggestions</button>
+              <button className={`pill ${isAdminView?'active':''}`} style={{border:'none', boxShadow:'none'}} onClick={()=>setIsAdminView(true)}>Admin View</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{maxHeight:'45vh', overflowY:'auto', paddingRight:'1rem'}}>
+          {displayed.length===0 && <div style={{textAlign:'center', color:'var(--muted)', padding:'3rem', background:'var(--bg)', borderRadius:'16px'}}>No suggestions found.</div>}
+          {displayed.map((s,i)=>(
+            <div key={i} className="modal-list-item" style={{flexDirection:'column', alignItems:'stretch'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'0.5rem'}}>
+                <div style={{paddingRight:'1rem'}}>
+                  <div style={{fontSize:'1rem', fontWeight:700, color:'var(--ink)', marginBottom:4}}>{s.title}</div>
+                  <div style={{fontSize:'0.8rem', color:'var(--muted)'}}>By {s.submittedBy?.name || 'User'} on {new Date(s.createdAt).toLocaleDateString()}</div>
+                </div>
+                <span className="pill" style={{background:s.status==='pending'?'var(--neutral)':s.status==='approved'?'var(--positive)':'var(--negative)', color:'white', fontSize:'0.75rem'}}>
+                  {s.status.toUpperCase()}
+                </span>
+              </div>
+              <a href={s.url} target="_blank" rel="noreferrer" style={{fontSize:'0.8rem', color:'var(--accent)', marginBottom:'0.5rem', wordBreak:'break-all'}}>{s.url}</a>
+              {isAdminView && s.status === 'pending' && (
+                <div style={{display:'flex', gap:'8px', marginTop:'0.5rem'}}>
+                  <button className="pill" style={{background:'var(--positive)', color:'white', flex:1, justifyContent:'center'}} onClick={()=>handleAction(s, 'approved')}>✓ Approve</button>
+                  <button className="pill" style={{background:'var(--negative)', color:'white', flex:1, justifyContent:'center'}} onClick={()=>handleAction(s, 'rejected')}>✕ Reject</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SavedArticlesModal({ onClose, onOpenArticle }) {
+  const saved = getSavedArticles();
+  return (
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-card" style={{maxWidth:650}}>
+        <button className="modal-close-btn" onClick={onClose}>✕</button>
+        <div style={{textAlign:'center', marginBottom:'2rem'}}>
+          <div style={{fontSize:'3.5rem', marginBottom:'0.5rem'}}>🔖</div>
+          <h2 style={{fontFamily:'var(--font-display)', fontSize:'2rem', fontWeight:900, color:'var(--ink)'}}>My Saved Articles</h2>
+          <p style={{fontSize:'1rem', color:'var(--muted)'}}>Read them whenever you want.</p>
+        </div>
+        <div className="small-article-list" style={{maxHeight:'55vh', overflowY:'auto', paddingRight:'1rem'}}>
+          {saved.length===0 && <div style={{textAlign:'center', color:'var(--muted)', padding:'3rem', background:'var(--bg)', borderRadius:'16px'}}>No saved articles yet.</div>}
+          {saved.map(a=>(
+             <div key={a.url} className="modal-list-item" onClick={()=>{onClose(); onOpenArticle(a);}} style={{cursor:'pointer', padding:'12px'}}>
+                <img className="small-thumb" src={a.image||`https://picsum.photos/seed/${docId(a.title)}/100/100`} alt="" style={{width:80, height:80, borderRadius:'12px'}}/>
+                <div className="small-article-content" style={{marginLeft:'1rem'}}>
+                  <div className="small-title" style={{fontSize:'1rem'}}>{a.title}</div>
+                  <div className="small-meta" style={{marginTop:'0.5rem'}}>{a.source} · {timeAgo(a.publishedAt)}</div>
+                </div>
+             </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -769,98 +936,51 @@ function BreakingTicker({ articles }) {
   );
 }
 
-// ══ SEARCH OVERLAY ═══════════════════════════════════════════════════════════
-function SearchOverlay({ onClose, onSearch }) {
-  const [query, setQuery] = useState('');
-  const [history, setHistory] = useState(()=>JSON.parse(localStorage.getItem('searchHistory')||'[]'));
+// ══ VOICE SEARCH FAB ══════════════════════════════════════════════════════════
+function VoiceSearch({ onResult }) {
+  const [listening, setListening] = useState(false);
   
-  useEffect(()=>{ document.getElementById('search-input-modal')?.focus(); },[]);
-
-  function doSearch(q=query) {
-    const term = q.trim();
-    if(term) {
-      const h=[term,...history.filter(x=>x!==term)].slice(0,8);
-      setHistory(h); localStorage.setItem('searchHistory',JSON.stringify(h));
+  function toggleListen() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error('Voice search is not supported in this browser.');
+      return;
     }
-    onSearch(term); onClose();
+    if (listening) return;
+    
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    
+    recognition.onstart = () => { setListening(true); toast('Listening...'); };
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      onResult(transcript);
+      toast.success(`Searched: "${transcript}"`);
+    };
+    recognition.onerror = () => { setListening(false); toast.error('Voice search failed.'); };
+    recognition.onend = () => setListening(false);
+    
+    recognition.start();
   }
 
   return (
-    <div className="search-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="search-box">
-        <div className="search-input-wrap">
-          <span style={{color:'var(--muted)',fontSize:'1.1rem'}}>🔍</span>
-          <input id="search-input-modal" value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doSearch()} placeholder="Search news, topics, events..."/>
-          <button onClick={onClose} style={{color:'var(--muted)',fontSize:'1.1rem'}}>✕</button>
-        </div>
-        {history.length>0&&(
-          <div className="search-suggestions">
-            {history.slice(0,5).map(h=>(
-              <div key={h} className="search-suggestion-item" onClick={()=>doSearch(h)}>🕐 {h}</div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ══ CHATBOT ════════════════════════════════════════════════════════════════════
-function Chatbot() {
-  const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([{role:'bot',text:"Hi! 👋 I'm your AI news assistant. Ask me anything about today's news!"}]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const endRef = useRef(null);
-  useEffect(()=>{ endRef.current?.scrollIntoView({behavior:'smooth'}); },[messages]);
-
-  async function send() {
-    if(!input.trim()||loading) return;
-    const msg=input.trim(); setInput('');
-    setMessages(m=>[...m,{role:'user',text:msg}]);
-    setLoading(true);
-    try {
-      const history=messages.filter(m=>m.role==='user').map(m=>({role:'user',content:m.text}));
-      const res=await axios.post('/api/ai/chat',{message:msg,history});
-      setMessages(m=>[...m,{role:'bot',text:res.data.reply}]);
-    } catch { setMessages(m=>[...m,{role:'bot',text:"Sorry, I'm having trouble connecting."}]); }
-    setLoading(false);
-  }
-
-  return (
-    <>
-      {open&&(
-        <div className="chatbot-window">
-          <div className="chatbot-header">
-            <div className="chatbot-title"><div className="chatbot-online"/>NewsAI Assistant</div>
-            <button onClick={()=>setOpen(false)} style={{color:'rgba(255,255,255,0.8)',fontSize:'1.1rem'}}>✕</button>
-          </div>
-          <div className="chatbot-messages">
-            {messages.map((m,i)=><div key={i} className={`chat-msg ${m.role}`}>{m.text}</div>)}
-            {loading&&<div className="chat-msg bot"><div className="spinner"/></div>}
-            <div ref={endRef}/>
-          </div>
-          <div className="chatbot-input-row">
-            <input className="chatbot-input" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Ask about news..."/>
-            <button className="chatbot-send" onClick={send}>➤</button>
-          </div>
-        </div>
-      )}
-      <button className="chatbot-fab" onClick={()=>setOpen(o=>!o)} title="AI Assistant">{open?'✕':'🤖'}</button>
-    </>
+    <button className={`chatbot-fab ${listening ? 'listening' : ''}`} onClick={toggleListen} title="Voice Search" style={{background: listening?'var(--negative)':'var(--accent)', color:'white'}}>
+      {listening ? <div className="spinner" style={{borderColor:'white',borderTopColor:'transparent'}}/> : '🎤'}
+    </button>
   );
 }
 
 // ══ NAVBAR ════════════════════════════════════════════════════════════════════
-function Navbar({ category, setCategory, onOpenWrite, onSearch, theme, setTheme, onSuggest, onSaved, onComments, onSuggestions }) {
-  const { user, logout } = useAuth();
-  const [showMenu, setShowMenu] = useState(false);
+function Navbar({ category, setCategory, onOpenWrite, theme, setTheme, onSuggest, onSaved, onComments, onSuggestions }) {
+  const { user } = useAuth();
 
   return (
     <nav className="main-nav">
       <div className="nav-left">
         <div className="logo-pill">
-          <span style={{fontSize:'1.2rem', color:'var(--accent)'}}>⚛️</span> NewsAI
+          <img src="/logo.png" alt="NewsAI" style={{height: 24, width: 'auto'}} />
+          NewsAI
         </div>
         <div className="nav-links">
           {CATS.map(cat => (
@@ -872,38 +992,17 @@ function Navbar({ category, setCategory, onOpenWrite, onSearch, theme, setTheme,
               {cat}
             </button>
           ))}
-          <div style={{position:'relative'}}>
-            <button className="pill" onClick={()=>setShowMenu(!showMenu)}>...</button>
-            {showMenu && (
-              <div className="user-dropdown" style={{top:'calc(100% + 5px)', left:0}}>
-                <button className="user-drop-item" onClick={()=>{setTheme(theme==='light'?'dark':'light'); setShowMenu(false);}}>
-                  {theme==='light'?'🌙 Dark Mode':'☀️ Light Mode'}
-                </button>
-                <div className="user-drop-divider"/>
-                <div style={{padding:'10px', fontSize:'0.75rem', color:'var(--muted)', fontWeight:700, letterSpacing:'0.05em'}}>AI/ML FEATURES</div>
-                <button className="user-drop-item" onClick={()=>setShowMenu(false)}>📝 Article Summarizer</button>
-                <button className="user-drop-item" onClick={()=>setShowMenu(false)}>😊 Sentiment Analysis</button>
-                <button className="user-drop-item" onClick={()=>setShowMenu(false)}>✅ Credibility Scorer</button>
-                <button className="user-drop-item" onClick={()=>setShowMenu(false)}>⚖️ Bias Detector</button>
-                <button className="user-drop-item" onClick={()=>setShowMenu(false)}>👶 ELI5 Simplifier</button>
-                <button className="user-drop-item" onClick={()=>setShowMenu(false)}>🌐 Multilingual Translator</button>
-                <button className="user-drop-item" onClick={()=>setShowMenu(false)}>🏷️ Smart Tag Generator</button>
-                <button className="user-drop-item" onClick={()=>setShowMenu(false)}>🤖 AI Chatbot</button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
       
       <div className="nav-right">
         <div className="navbar-meta"><LiveClock/><WeatherWidget/></div>
-        <button className="icon-btn" onClick={onSearch} title="Search">🔍</button>
         {user ? (
           <>
             <button className="pill" onClick={onOpenWrite} style={{background:'var(--ink)', color:'var(--bg)'}}>
               + Write
             </button>
-            <UserMenu onOpenSuggest={onSuggest} onOpenSaved={onSaved} onOpenComments={onComments} onOpenSuggestions={onSuggestions}/>
+            <UserMenu onOpenSuggest={onSuggest} onOpenSaved={onSaved} onOpenComments={onComments} onOpenSuggestions={onSuggestions} theme={theme} setTheme={setTheme}/>
           </>
         ) : (
           <span style={{fontSize:'0.75rem',color:'var(--muted)',fontWeight:600,whiteSpace:'nowrap'}}>Sign in ↑</span>
@@ -915,7 +1014,7 @@ function Navbar({ category, setCategory, onOpenWrite, onSearch, theme, setTheme,
 
 // ══ ARTICLE CARD ══════════════════════════════════════════════════════════════
 function ArticleCard({ article, onClick }) {
-  const isVideo = article.url?.includes('youtube') || article.url?.includes('video');
+  const ytId = getYoutubeId(article.url);
   const fallbackImg = `https://picsum.photos/seed/${docId(article.url || article.title).slice(0,5)}/600/400`;
 
   return (
@@ -927,59 +1026,27 @@ function ArticleCard({ article, onClick }) {
       </div>
       <h3 className="card-title">{article.title}</h3>
       <div className="card-image-wrap">
-        <img src={article.image || fallbackImg} alt={article.title} onError={e=>e.target.src=fallbackImg} loading="lazy" />
+        {ytId ? (
+          <div style={{position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden'}}>
+            <iframe 
+              src={`https://www.youtube.com/embed/${ytId}`} 
+              style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} 
+              frameBorder="0" 
+              allowFullScreen 
+              title={article.title}
+            ></iframe>
+          </div>
+        ) : (
+          <img src={article.image || fallbackImg} alt={article.title} onError={e=>e.target.src=fallbackImg} loading="lazy" />
+        )}
       </div>
       <div className="card-footer">
-        <div className="card-tags">#{article.category || 'News'}</div>
+        <div className="card-tags">
+          <button className="icon-btn" style={{width:32,height:32,border:'none',background:'transparent',color:'var(--ink2)',fontSize:'1.2rem'}}>...</button>
+        </div>
         <button className="pill">
           Read <span style={{fontSize:'1.1rem'}}>→</span>
         </button>
-      </div>
-    </div>
-  );
-}
-
-// ══ USER MODALS ══════════════════════════════════════════════════════════════
-function MyCommentsModal({ onClose }) {
-  return (
-    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal-card">
-        <button className="modal-close-btn" onClick={onClose}>✕</button>
-        <h2 style={{fontFamily:'var(--font-display)', fontSize:'1.5rem', marginBottom:'1rem'}}>My Comments</h2>
-        <p style={{color:'var(--muted)'}}>Comments you have posted will appear here.</p>
-      </div>
-    </div>
-  );
-}
-function SuggestedArticlesModal({ onClose }) {
-  return (
-    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal-card">
-        <button className="modal-close-btn" onClick={onClose}>✕</button>
-        <h2 style={{fontFamily:'var(--font-display)', fontSize:'1.5rem', marginBottom:'1rem'}}>Suggested Articles</h2>
-        <p style={{color:'var(--muted)'}}>Articles you have suggested will appear here.</p>
-      </div>
-    </div>
-  );
-}
-function SavedArticlesModal({ onClose }) {
-  const saved = getSavedArticles();
-  return (
-    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal-card">
-        <button className="modal-close-btn" onClick={onClose}>✕</button>
-        <h2 style={{fontFamily:'var(--font-display)', fontSize:'1.5rem', marginBottom:'1rem'}}>Saved Articles</h2>
-        <div className="small-article-list">
-          {saved.length===0 && <p style={{color:'var(--muted)'}}>No saved articles yet.</p>}
-          {saved.map(a=>(
-             <div key={a.url} className="small-article-item" onClick={()=>window.open(a.url, '_blank')}>
-                <div className="small-article-content">
-                  <div className="small-title">{a.title}</div>
-                  <div className="small-meta">{a.source}</div>
-                </div>
-             </div>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -996,7 +1063,6 @@ export default function App() {
   // Modals state
   const [writeOpen, setWriteOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -1030,9 +1096,11 @@ export default function App() {
     setLoading(false);
   }
 
-  useEffect(() => { fetchNews(category, searchQuery); }, [category]);
+  useEffect(() => { 
+    setSearchQuery(''); 
+    fetchNews(category, ''); 
+  }, [category]);
 
-  // Use gsap.from() for reliable animations instead of fromTo which can stuck opacity:0
   useGSAP(() => {
     if (!loading && articles.length > 0) {
       gsap.from('.anim-in', {
@@ -1052,11 +1120,18 @@ export default function App() {
     }
   };
 
+  const handleVoiceSearch = (transcript) => {
+    setSearchQuery(transcript);
+    fetchNews(category, transcript);
+  };
+
   if(!user) return <AuthPage/>;
 
   const heroArticle = articles.length > 0 ? articles[0] : null;
   const recommendedArticles = articles.length > 5 ? articles.slice(1, 6) : articles.slice(1);
   const gridArticles = articles.length > 6 ? articles.slice(6) : articles.slice(1);
+
+  const heroYtId = heroArticle ? getYoutubeId(heroArticle.url) : null;
 
   return (
     <div ref={containerRef}>
@@ -1064,7 +1139,6 @@ export default function App() {
       <Navbar 
         category={category} setCategory={setCategory} 
         onOpenWrite={()=>setWriteOpen(true)} 
-        onSearch={()=>setSearchOpen(true)}
         theme={theme} setTheme={setTheme}
         onSuggest={()=>setSuggestOpen(true)}
         onSaved={()=>setSavedOpen(true)}
@@ -1083,9 +1157,13 @@ export default function App() {
           ) : heroArticle ? (
             <div className="hero-card anim-in" onClick={()=>setSelected(heroArticle)}>
               <div className="hero-card-bg">
-                <img src={heroArticle.image || `https://picsum.photos/seed/${docId(heroArticle.title)}/1200/600`} alt="" />
+                {heroYtId ? (
+                  <div style={{width:'100%', height:'100%', background:'#000'}}/>
+                ) : (
+                  <img src={heroArticle.image || `https://picsum.photos/seed/${docId(heroArticle.title)}/1200/600`} alt="" />
+                )}
               </div>
-              <div>
+              <div style={{position:'relative', zIndex:2}}>
                 <div className="hero-badge">BEST OF THE WEEK</div>
                 <div className="card-header-meta" style={{color:'var(--accent)'}}>
                   <span className="card-source">{heroArticle.source}</span>
@@ -1093,9 +1171,11 @@ export default function App() {
                   <span style={{color:'var(--ink)'}}>{timeAgo(heroArticle.publishedAt)}</span>
                 </div>
                 <h1 className="hero-title">{heroArticle.title}</h1>
-                <div className="hero-tags">#{heroArticle.category || 'News'} #Trending</div>
+                <div className="hero-tags">
+                  <button className="icon-btn" style={{width:32,height:32,border:'none',background:'var(--surface-solid)',color:'var(--ink2)',fontSize:'1.2rem', boxShadow:'var(--shadow-sm)'}} onClick={(e)=>{e.stopPropagation();}}>...</button>
+                </div>
               </div>
-              <div className="hero-bottom-meta">
+              <div className="hero-bottom-meta" style={{position:'relative', zIndex:2}}>
                 <button className="hero-action">
                   Read article <span>→</span>
                 </button>
@@ -1145,7 +1225,11 @@ export default function App() {
 
             {recommendedArticles.length > 0 && (
               <div className="recommended-featured" onClick={()=>setSelected(recommendedArticles[0])}>
-                <img src={recommendedArticles[0].image || `https://picsum.photos/seed/${docId(recommendedArticles[0].title)}/600/400`} alt="" />
+                {getYoutubeId(recommendedArticles[0].url) ? (
+                   <div style={{width:'100%', height:'100%', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'2rem'}}>▶️</div>
+                ) : (
+                   <img src={recommendedArticles[0].image || `https://picsum.photos/seed/${docId(recommendedArticles[0].title)}/600/400`} alt="" />
+                )}
                 <div className="featured-overlay">
                   <div className="featured-meta">{recommendedArticles[0].source} · {timeAgo(recommendedArticles[0].publishedAt)}</div>
                   <div className="featured-title">{recommendedArticles[0].title}</div>
@@ -1164,7 +1248,11 @@ export default function App() {
                     </div>
                     <div className="small-title">{a.title}</div>
                   </div>
-                  <img className="small-thumb" src={a.image || `https://picsum.photos/seed/${docId(a.title)}/200/200`} alt="" />
+                  {getYoutubeId(a.url) ? (
+                    <div className="small-thumb" style={{background:'#000', display:'flex', alignItems:'center', justifyContent:'center', color:'white'}}>▶️</div>
+                  ) : (
+                    <img className="small-thumb" src={a.image || `https://picsum.photos/seed/${docId(a.title)}/200/200`} alt="" />
+                  )}
                 </div>
               ))}
             </div>
@@ -1176,16 +1264,43 @@ export default function App() {
       {/* MODALS */}
       {selected&&<ArticleModal article={selected} onClose={()=>setSelected(null)}/>}
       {writeOpen && <WriteArticleModal onClose={()=>setWriteOpen(false)} onPublish={(article)=>fetchNews()} />}
-      {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSearch={(q)=>{setSearchQuery(q); fetchNews(category, q);}}/>}
       {suggestOpen&&<SuggestArticle onClose={()=>setSuggestOpen(false)}/>}
-      {savedOpen&&<SavedArticlesModal onClose={()=>setSavedOpen(false)}/>}
+      {savedOpen&&<SavedArticlesModal onClose={()=>setSavedOpen(false)} onOpenArticle={setSelected}/>}
       {commentsOpen&&<MyCommentsModal onClose={()=>setCommentsOpen(false)}/>}
-      {suggestionsOpen&&<SuggestedArticlesModal onClose={()=>setSuggestionsOpen(false)}/>}
+      {suggestionsOpen&&<SuggestedArticlesModal onClose={()=>setSuggestionsOpen(false)} onPublish={(article)=>fetchNews()}/>}
       
-      <Chatbot/>
+      {/* VOICE SEARCH */}
+      <VoiceSearch onResult={handleVoiceSearch}/>
       
-      <footer>
-        <strong>NewsAI</strong> — AI-Powered Smart News Aggregator &nbsp;·&nbsp; React · Node.js · Firebase · Claude AI
+      <footer className="main-footer">
+        <div className="footer-content">
+          <div className="footer-brand">
+            <span style={{color:'var(--accent)', marginRight:8}}><img src="/logo.png" alt="NewsAI" style={{height: 32, width: 'auto', display:'inline-block'}} /></span> NewsAI
+            <p className="footer-desc">Your intelligent daily news aggregator, providing real-time AI analysis, sentiment scoring, and breaking coverage.</p>
+          </div>
+          <div className="footer-links">
+            <div className="footer-col">
+              <h4>Categories</h4>
+              <button onClick={()=>setCategory('Business')}>Business</button>
+              <button onClick={()=>setCategory('Technology')}>Technology</button>
+              <button onClick={()=>setCategory('Entertainment')}>Entertainment</button>
+            </div>
+            <div className="footer-col">
+              <h4>Company</h4>
+              <button>About Us</button>
+              <button>Careers</button>
+              <button>Privacy Policy</button>
+            </div>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span>© 2026 NewsAI. All rights reserved.</span>
+          <div className="footer-socials">
+            <button className="icon-btn">𝕏</button>
+            <button className="icon-btn">in</button>
+            <button className="icon-btn">f</button>
+          </div>
+        </div>
       </footer>
     </div>
   );
